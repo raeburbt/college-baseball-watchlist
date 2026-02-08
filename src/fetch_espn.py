@@ -27,7 +27,8 @@ def fetch_espn_scoreboard(datestr_yyyymmdd: str) -> list[dict]:
         home_team = None
         away_team = None
         for c in competitors:
-            team = c.get("team", {}).get("displayName")
+            t = c.get("team", {}) or {}
+team = t.get("shortDisplayName") or t.get("displayName")
             if not team:
                 continue
             if c.get("homeAway") == "home":
