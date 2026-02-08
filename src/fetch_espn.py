@@ -14,6 +14,7 @@ def fetch_espn_scoreboard(datestr_yyyymmdd: str) -> list[dict]:
     data = resp.json()
 
     events = []
+
     for ev in data.get("events", []):
         competitions = ev.get("competitions", [])
         if not competitions:
@@ -26,11 +27,16 @@ def fetch_espn_scoreboard(datestr_yyyymmdd: str) -> list[dict]:
 
         home_team = None
         away_team = None
+
         for c in competitors:
-            t = c.get("team", {}) or {}
-team = t.get("shortDisplayName") or t.get("displayName")
+            team_obj = c.get("team", {}) or {}
+
+            # Use shortDisplayName first (clean school name)
+            team = team_obj.get("shortDisplayName") or team_obj.get("displayName")
+
             if not team:
                 continue
+
             if c.get("homeAway") == "home":
                 home_team = team
             elif c.get("homeAway") == "away":
@@ -40,36 +46,3 @@ team = t.get("shortDisplayName") or t.get("displayName")
             continue
 
         start = comp.get("date") or ev.get("date")
-        if not start:
-            continue
-
-        watch = ""
-        broadcasts = comp.get("broadcasts") or []
-        if broadcasts:
-            names = []
-            for b in broadcasts:
-                nm = b.get("names") or []
-                if nm:
-                    names.extend(nm)
-            watch = ", ".join(dict.fromkeys(names))
-
-        if not watch:
-            geo = comp.get("geoBroadcasts") or []
-            short_names = []
-            for g in geo:
-                media = g.get("media", {})
-                sn = media.get("shortName") or media.get("name")
-                if sn:
-                    short_names.append(sn)
-            if short_names:
-                watch = ", ".join(dict.fromkeys(short_names))
-
-        events.append({
-            "away": away_team,
-            "home": home_team,
-            "start_utc": start,
-            "watch": watch,
-            "event_id": ev.get("id", ""),
-        })
-
-    return events
