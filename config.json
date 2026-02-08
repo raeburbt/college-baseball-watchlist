@@ -1,0 +1,9 @@
+{
+  "favorite_teams": ["Virginia"],
+  "favorite_team_bump": 4,
+  "both_ranked_bonus": 12,
+  "top10_vs_ranked_bonus": 6,
+  "broadcast_bonus": 2,
+  "top_n": 3,
+  "lookahead_days": 7
+}
