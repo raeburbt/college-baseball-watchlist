@@ -11,7 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-           - name: Generate site
+      - name: Generate site
         run: |
           python src/main.py
           echo "----- FIRST 20 LINES OF docs/index.html -----"
@@ -43,8 +42,6 @@ jobs:
           git add docs/index.html docs/data/*.json || true
           echo "----- GIT STATUS -----"
           git status
-          echo "----- GIT DIFF (FIRST 80 LINES) -----"
+          echo "----- GIT DIFF STAT -----"
           git diff --stat || true
-          git commit -m "Daily update" || echo "No changes to commit"
-          git push
-
+          git commit -m "Daily update" || echo "No chang
