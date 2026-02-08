@@ -1,0 +1,20 @@
+{
+  "generated_at_utc": "2026-02-08T16:40:54Z",
+  "config": {
+    "default_favorite_team": "Virginia",
+    "favorite_team_bump": 4,
+    "both_ranked_bonus": 12,
+    "top10_vs_ranked_bonus": 6,
+    "broadcast_bonus": 2,
+    "top_n": 3
+  },
+  "by_day": {
+    "2026-02-08": [],
+    "2026-02-09": [],
+    "2026-02-10": [],
+    "2026-02-11": [],
+    "2026-02-12": [],
+    "2026-02-13": [],
+    "2026-02-14": []
+  }
+}

@@ -1,8 +1,238 @@
 <!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Watchlist</title></head>
-  <body>
-    <h1>College Baseball Watchlist</h1>
-    <p>If you can see this, GitHub Pages is working.</p>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>College Baseball Watchlist</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
+    h1 { margin: 0 0 8px 0; }
+    .sub { color: #444; margin-bottom: 18px; }
+    .controls { display: flex; gap: 10px; align-items: center; margin: 14px 0 24px 0; flex-wrap: wrap; }
+    select { padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; }
+    button { padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    .day { margin: 24px 0 34px 0; }
+    h2 { margin: 0 0 12px 0; padding-top: 8px; border-top: 1px solid #eee; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+    .matchup { font-size: 18px; font-weight: 700; }
+    .meta { margin-top: 6px; color: #333; }
+    .reason { margin-top: 10px; color: #222; line-height: 1.35; }
+    .empty { color: #666; }
+    .footer { margin-top: 26px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Top Ranked College Baseball Games (7-Day Lookahead)</h1>
+  <div class="sub" id="subline">Loading…</div>
+
+  <div class="controls">
+    <label for="favoriteSelect"><strong>Favorite team:</strong></label>
+    <select id="favoriteSelect"></select>
+    <button id="resetBtn" type="button">Reset to default (UVA)</button>
+  </div>
+
+  <div id="content"></div>
+
+  <div class="footer">
+    Rankings-driven MVP. Favorite-team bump persists in your browser and only changes via the selector.
+  </div>
+
+<script>
+const DATA_URL = "./data/games_by_day.json";
+const STORAGE_KEY = "cbw_favorite_team";
+
+function normTeamName(name) {
+  return (name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\.,'"()]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function rankPoints(rank) {
+  if (rank === null || rank === undefined) return 0;
+  if (rank >= 1 && rank <= 25) return 26 - rank;
+  return 0;
+}
+
+function hasTeam(game, favorite) {
+  const fav = normTeamName(favorite);
+  return normTeamName(game.away) === fav || normTeamName(game.home) === fav;
+}
+
+function scoreGame(game, cfg, favorite) {
+  let s = rankPoints(game.away_rank) + rankPoints(game.home_rank);
+
+  const awayRanked = game.away_rank !== null && game.away_rank !== undefined;
+  const homeRanked = game.home_rank !== null && game.home_rank !== undefined;
+
+  if (awayRanked && homeRanked) {
+    s += cfg.both_ranked_bonus;
+
+    const top10vsRanked =
+      (game.away_rank <= 10 && homeRanked) || (game.home_rank <= 10 && awayRanked);
+    if (top10vsRanked) s += cfg.top10_vs_ranked_bonus;
+  }
+
+  if (game.watch && game.watch.length > 0) s += cfg.broadcast_bonus;
+
+  if (favorite && hasTeam(game, favorite)) s += cfg.favorite_team_bump;
+
+  return s;
+}
+
+function buildReason(game) {
+  const awayRanked = game.away_rank != null;
+  const homeRanked = game.home_rank != null;
+
+  let base = "";
+  if (awayRanked && homeRanked) {
+    if (game.away_rank <= 10 && game.home_rank <= 10) base = "Top-10 showdown — this is the headline game on the slate.";
+    else base = "Top-25 matchup — two ranked teams, strong chance this stays meaningful late.";
+  } else {
+    const rankedTeam = awayRanked ? game.away : game.home;
+    base = `Ranked team watch — ${rankedTeam} is ranked, and this one has upset potential.`;
+  }
+
+  if (game.watch) base += ` Available on: ${game.watch}.`;
+  return base;
+}
+
+function fmtTimeMT(startIso) {
+  const dt = new Date(startIso);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Denver",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(dt) + " MT";
+}
+
+function showTeam(name, rank) {
+  return (rank != null) ? `#${rank} ${name}` : name;
+}
+
+function uniqueTeamsFromData(byDay) {
+  const set = new Set();
+  Object.values(byDay).forEach(games => {
+    games.forEach(g => {
+      set.add(g.away);
+      set.add(g.home);
+    });
+  });
+  return Array.from(set).sort((a,b) => a.localeCompare(b));
+}
+
+function populateSelector(selectEl, teams, defaultTeam) {
+  selectEl.innerHTML = "";
+  const normDefault = normTeamName(defaultTeam);
+
+  // Always include defaultTeam first
+  const ordered = [];
+  ordered.push(defaultTeam);
+
+  // Then all teams except duplicates of default
+  teams.forEach(t => {
+    if (normTeamName(t) !== normDefault) ordered.push(t);
+  });
+
+  // De-dupe preserving order
+  const seen = new Set();
+  ordered.forEach(t => {
+    const key = normTeamName(t);
+    if (seen.has(key)) return;
+    seen.add(key);
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    selectEl.appendChild(opt);
+  });
+}
+
+function render(byDay, cfg, favorite) {
+  const content = document.getElementById("content");
+  content.innerHTML = "";
+
+  const days = Object.keys(byDay).sort();
+  days.forEach(day => {
+    const games = byDay[day] || [];
+    const sec = document.createElement("section");
+    sec.className = "day";
+    sec.innerHTML = `<h2>${day}</h2>`;
+
+    if (games.length === 0) {
+      sec.innerHTML += `<div class="empty">No ranked games found.</div>`;
+      content.appendChild(sec);
+      return;
+    }
+
+    const scored = games.map(g => ({...g, _score: scoreGame(g, cfg, favorite)}));
+    scored.sort((a,b) => b._score - a._score);
+    const top = scored.slice(0, cfg.top_n);
+
+    top.forEach(g => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const matchup = `${showTeam(g.away, g.away_rank)} @ ${showTeam(g.home, g.home_rank)}`;
+      const time = fmtTimeMT(g.start_utc);
+      const reason = buildReason(g);
+
+      card.innerHTML = `
+        <div class="matchup">${matchup}</div>
+        <div class="meta">${time}</div>
+        <div class="reason">${reason}</div>
+      `;
+      sec.appendChild(card);
+    });
+
+    content.appendChild(sec);
+  });
+}
+
+async function init() {
+  const res = await fetch(DATA_URL, { cache: "no-store" });
+  const payload = await res.json();
+
+  const cfg = payload.config;
+  const byDay = payload.by_day;
+  const generated = payload.generated_at_utc;
+
+  const defaultFav = cfg.default_favorite_team || "Virginia";
+  const savedFav = localStorage.getItem(STORAGE_KEY);
+  const favorite = savedFav || defaultFav;
+
+  document.getElementById("subline").textContent =
+    `Generated ${generated} • Times shown in Mountain Time • Favorite: ${favorite}`;
+
+  const teams = uniqueTeamsFromData(byDay);
+  const select = document.getElementById("favoriteSelect");
+  populateSelector(select, teams, defaultFav);
+
+  // Ensure selection is in dropdown
+  const options = Array.from(select.options).map(o => o.value);
+  const useFav = options.includes(favorite) ? favorite : defaultFav;
+
+  select.value = useFav;
+  localStorage.setItem(STORAGE_KEY, useFav);
+
+  select.addEventListener("change", () => {
+    const newFav = select.value;
+    localStorage.setItem(STORAGE_KEY, newFav);
+    render(byDay, cfg, newFav);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    localStorage.setItem(STORAGE_KEY, defaultFav);
+    select.value = defaultFav;
+    render(byDay, cfg, defaultFav);
+  });
+
+  render(byDay, cfg, select.value);
+}
+
+init().catch(err => {
+  document.getElementById("subline").textContent = "Error loading data.";
+  document.getElementById("content").innerHTML = `<pre>${String(err)}</pre>`;
+});
+</script>
+</body>
 </html>
