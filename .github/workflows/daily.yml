@@ -28,15 +28,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate site
+           - name: Generate site
         run: |
           python src/main.py
+          echo "----- FIRST 20 LINES OF docs/index.html -----"
+          sed -n '1,20p' docs/index.html || true
+          echo "----- GREP FOR PLACEHOLDER PHRASE -----"
+          grep -n "If you can see this" docs/index.html || echo "Placeholder phrase NOT found."
 
       - name: Commit updated site
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/index.html docs/data/*.json || true
+          echo "----- GIT STATUS -----"
           git status
+          echo "----- GIT DIFF (FIRST 80 LINES) -----"
+          git diff --stat || true
           git commit -m "Daily update" || echo "No changes to commit"
           git push
+
