@@ -3,7 +3,10 @@ name: Daily Watchlist
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 16 * * *"  # ~9am MT (winter) / 10am MT (summer)
+    - cron: "0 16 * * *"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -11,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true  # uses GITHUB_TOKEN
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,6 +35,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html docs/data/games_by_day.json || true
+          git add docs/index.html docs/data/games_by_day.json docs/data/top_games_by_day.json || true
           git commit -m "Daily update" || echo "No changes to commit"
           git push
